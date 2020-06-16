@@ -73,7 +73,7 @@ def start_bme680_sensor(args):
     """Main program function, parse arguments, read configuration,
     setup client, listen for messages"""
 
-    i2c_address = bme680.I2C_ADDRESS_GND # 0x76, alt is 0x77
+    i2c_address = bme680.I2C_ADDR_PRIMARY # 0x76, alt is 0x77
 
     toffset = 0
     hoffset = 0
@@ -133,7 +133,7 @@ def start_bme680_sensor(args):
     # Initialise the BME280
     bus = SMBus(1)
 
-    sensor = bme680.BME680(i2c_addr=i2c_address, i2c_dev=bus)
+    sensor = bme680.BME680(i2c_addr=i2c_address, i2c_device=bus)
 
     if args.verbose:
         curr_datetime = datetime.datetime.now()
@@ -167,16 +167,53 @@ def start_bme680_sensor(args):
     # of the last 50 values to set the upper limit for calculating
     # gas_baseline.
     if args.verbose:
-        print("Collecting gas resistance burn-in data for 5 mins\n", file=file_handle) # FIXME: give the real time
+        curr_datetime = datetime.datetime.now()
+        str_datetime = curr_datetime.strftime("%Y-%m-%d %H:%M:%S")
+        print("{0}: collecting gas resistance burn-in data for {1:d} sec".format(str_datetime, burn_in_time) , file=file_handle) 
     while curr_time - start_time < burn_in_time:
         curr_time = time.time()
         if sensor.get_sensor_data() and sensor.data.heat_stable:
             gas = sensor.data.gas_resistance
             burn_in_data.append(gas)
+
+            hum = sensor.data.humidity + hoffset
+
+            temp_C = sensor.data.temperature
+            temp_F = 9.0/5.0 * temp_C + 32 + toffset
+            temp_K = temp_C + 273.15
+
+            press_A = sensor.data.pressure + poffset
+
+            # https://www.sandhurstweather.org.uk/barometric.pdf
+            if elevation > SEALEVEL_MIN:
+                # option one: Sea Level Pressure = Station Pressure / e ** -elevation / (temperature x 29.263)
+                #press_S = press_A / math.exp( - elevation / (temp_K * 29.263))
+                # option two: Sea Level Pressure = Station Pressure + (elevation/9.2)
+                press_S = press_A + (elevation/9.2)
+            else:
+                press_S = press_A
+
             my_time = int(round(curr_time))
-            if args.verbose:
-                if (my_time % 60 == 0): 
-                    print("Gas: {0} Ohms".format(gas), file=file_handle) # only if verbose?
+            if (my_time % 60 == 0): 
+                curr_datetime = datetime.datetime.now()
+                str_datetime = curr_datetime.strftime("%Y-%m-%d %H:%M:%S")
+                
+                if args.verbose:
+                    print("{0}: gas burn-in: {1:.2f} Ohms, temperature: {2:.2f} F, humidity: {3:.2f} %RH".
+                          format(str_datetime, gas, temp_F, hum), file=file_handle)
+                    file_handle.flush()
+
+                temperature = str(round(temp_F, 2))
+                humidity = str(round(hum, 2))
+                pressure = str(round(press_A, 2))
+                pressure_sealevel = str(round(press_S, 2))
+
+                client.publish(topic_temp, temperature)
+                client.publish(topic_hum, humidity)
+                client.publish(topic_press, pressure)
+                if elevation > SEALEVEL_MIN:
+                    client.publish(topic_press_S, pressure_sealevel)
+
             time.sleep(1)
 
     gas_baseline = sum(burn_in_data[-50:]) / 50.0
@@ -190,8 +227,8 @@ def start_bme680_sensor(args):
 
     curr_datetime = datetime.datetime.now()
     str_datetime = curr_datetime.strftime("%Y-%m-%d %H:%M:%S")
-    print("{0}: pid: {1:d} Gas baseline: {0} Ohms, humidity baseline: {1:.2f} %RH\n".
-          format(str_datetime, os.getpid(), gas_baseline, hum_baseline), file=file_handle)
+    print("{0}: burn-in complete: gas baseline: {1:.2f} Ohms, humidity baseline: {2:.2f} %RH\n".
+          format(str_datetime, gas_baseline, hum_baseline), file=file_handle)
 
 
     while True:
@@ -245,21 +282,19 @@ def start_bme680_sensor(args):
                 str_datetime = curr_datetime.strftime("%Y-%m-%d %H:%M:%S")
                 
                 if args.verbose:
-                    print("{0}: Gas: {1:.2f} Ohms, temperature: {2:.2f} F, humidity: {3:.2f} %RH, air quality: {4:.2f}".
-                          format(str_datetime, gas, temp, hum, air_quality_score), file=file_handle)
-#                    print("{0}: temperature: {1:.1f} F, humidity: {2:.1f} %, pressure: {3:.2f} hPa, sealevel: {4:.2f} hPa".
-#                          format(str_datetime, temp_F, hum, press_A, press_S), file=file_handle)
+                    print("{0}: Gas: {1:.2f} Ohms, temperature: {2:.2f} F, humidity: {3:.2f} %RH, pressure: {4:.2f} hPa, sealevel: {5:.2f} hPa, air quality: {6:.2f} %".
+                          format(str_datetime, gas, temp_F, hum, press_A, press_S, air_quality_score), file=file_handle)
                     file_handle.flush()
 
 
-                humidity = str(round(hum, 2))
                 temperature = str(round(temp_F, 2))
+                humidity = str(round(hum, 2))
                 pressure = str(round(press_A, 2))
                 pressure_sealevel = str(round(press_S, 2))
                 air_qual = str(round(air_quality_score, 2))
             
-                client.publish(topic_hum, humidity)
                 client.publish(topic_temp, temperature)
+                client.publish(topic_hum, humidity)
                 client.publish(topic_press, pressure)
                 
                 if elevation > SEALEVEL_MIN:
