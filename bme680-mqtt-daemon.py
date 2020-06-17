@@ -35,6 +35,9 @@ MQTT_SEC = "bme680"
 
 SEALEVEL_MIN = -999
 
+class struct(object):
+    pass
+
 def receive_signal(signal_number, frame):
     """function to attach to a signal handler, and simply exit
     """
@@ -143,6 +146,8 @@ def start_bme680_sensor(args):
 
     i2c_address = bme680.I2C_ADDR_PRIMARY # 0x76, alt is 0x77
 
+    options = struct()
+    
     options.toffset = 0
     options.hoffset = 0
     options.poffset = 0
