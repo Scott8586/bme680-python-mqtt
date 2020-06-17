@@ -312,7 +312,7 @@ def start_bme680_sensor(args):
     while True:
         if sensor.get_sensor_data() and sensor.data.heat_stable:
             
-#            curr_time = time.time()
+            curr_time = time.time()
             gas = sensor.data.gas_resistance
             gas_offset = gas_baseline - gas
 
@@ -339,30 +339,7 @@ def start_bme680_sensor(args):
             my_time = int(round(curr_time))
             if (my_time % 60 == 0): 
                 publish_mqtt(client, sensor.data, options, file_handle, air_quality_score)
-#                 curr_datetime = datetime.datetime.now()
-#                 str_datetime = curr_datetime.strftime("%Y-%m-%d %H:%M:%S")
-#                 
-#                 if args.verbose:
-#                     print("{0}: Gas: {1:.2f} Ohms, temperature: {2:.2f} F, humidity: {3:.2f} %RH, pressure: {4:.2f} hPa, sealevel: {5:.2f} hPa, air quality: {6:.2f} %".
-#                           format(str_datetime, gas, temp_F, hum, press_A, press_S, air_quality_score), file=file_handle)
-#                     file_handle.flush()
-# 
-# 
-#                 temperature = str(round(temp_F, 2))
-#                 humidity = str(round(hum, 2))
-#                 pressure = str(round(press_A, 2))
-#                 pressure_sealevel = str(round(press_S, 2))
-#                 air_qual = str(round(air_quality_score, 2))
-#             
-#                 client.publish(topic_temp, temperature)
-#                 client.publish(topic_hum, humidity)
-#                 client.publish(topic_press, pressure)
-#                 
-#                 if elevation > SEALEVEL_MIN:
-#                     client.publish(topic_press_S, pressure_sealevel)
-# 
-#                 client.publish(topic_aqi, air_qual)
-
+                
             time.sleep(1)
 
 if __name__ == '__main__':
