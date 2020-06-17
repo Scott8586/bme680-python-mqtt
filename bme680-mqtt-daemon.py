@@ -20,8 +20,6 @@ import configparser
 import daemon
 from daemon import pidfile
 import paho.mqtt.client as mqtt
-from _ast import AugAssign
-from pylint.checkers.base import HUMAN_READABLE_TYPES
 from paho.mqtt import publish
 
 try:
