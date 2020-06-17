@@ -54,7 +54,7 @@ def on_connect(client, userdata, flags, return_code):
         print("Connected with result code: ", str(return_code))
 
 
-def publish_mqtt(sensor_data, options, file_handle, air_quality_score=0, format = "flat"):
+def publish_mqtt(client, sensor_data, options, file_handle, air_quality_score=0, format = "flat"):
     """Publish the sensor data to mqtt, in either flat, or JSON format
     """
     
@@ -251,7 +251,7 @@ def start_bme680_sensor(args):
             burn_in_data.append(gas)
             my_time = int(round(curr_time))
             if (my_time % 60 == 0):
-                publish_mqtt(sensor.data, options, file_handle)
+                publish_mqtt(client, sensor.data, options, file_handle)
  
             time.sleep(1)
             
@@ -353,7 +353,7 @@ def start_bme680_sensor(args):
            
             my_time = int(round(curr_time))
             if (my_time % 60 == 0): 
-                publish_mqtt(sensor.data, options, file_handle, air_quality_score)
+                publish_mqtt(client, sensor.data, options, file_handle, air_quality_score)
 #                 curr_datetime = datetime.datetime.now()
 #                 str_datetime = curr_datetime.strftime("%Y-%m-%d %H:%M:%S")
 #                 
