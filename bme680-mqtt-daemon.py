@@ -10,6 +10,7 @@ import time
 import datetime
 import platform
 #import math # needed only for detailed sealavel pressure calculation
+import json
 import os
 import signal
 import sys
@@ -19,6 +20,9 @@ import configparser
 import daemon
 from daemon import pidfile
 import paho.mqtt.client as mqtt
+from _ast import AugAssign
+from pylint.checkers.base import HUMAN_READABLE_TYPES
+from paho.mqtt import publish
 
 try:
     from smbus2 import SMBus
@@ -49,6 +53,72 @@ def on_connect(client, userdata, flags, return_code):
         print("Connected with result code: ", str(return_code))
 
 
+def publish_mqtt(sensor_data, air_quality_score=0, options, file_handle, format = "flat"):
+    """Publish the sensor data to mqtt, in either flat, or JSON format
+    """
+    
+    topic_temp  = options.topic + '/' + 'bme680-temperature'
+    topic_hum   = options.topic + '/' + 'bme680-humidity'
+    topic_press = options.topic + '/' + 'bme680-pressure'
+    topic_press_S = options.topic + '/' + 'bme680-sealevel-pressure'
+    topic_aqi   = options.topic + '/' + 'bme680-air-quality'
+    
+    gas = sensor_data.gas_resistance
+    
+    hum = sensor_data.humidity + options.hoffset
+
+    temp_C = sensor_data.temperature
+    temp_F = 9.0/5.0 * temp_C + 32 + options.toffset
+    temp_K = temp_C + 273.15
+
+    press_A = sensor_data.pressure + options.poffset
+
+    # https://www.sandhurstweather.org.uk/barometric.pdf
+    if options.elevation > SEALEVEL_MIN:
+        # option one: Sea Level Pressure = Station Pressure / e ** -elevation / (temperature x 29.263)
+        #press_S = press_A / math.exp( - elevation / (temp_K * 29.263))
+        # option two: Sea Level Pressure = Station Pressure + (elevation/9.2)
+        press_S = press_A + (elevation/9.2)
+    else:
+        press_S = press_A
+
+    curr_datetime = datetime.datetime.now()
+    
+    if args.verbose:
+        str_datetime = curr_datetime.strftime("%Y-%m-%d %H:%M:%S")
+        print("{0}: gas: {1:.2f} Ohms, temperature: {2:.2f} F, humidity: {3:.2f} %RH, pressure: {4:.2f} hPa, sealevel: {5:.2f} hPa, air quality: {6:.2f} %".
+            format(str_datetime, gas, temp_F, hum, press_A, press_S, air_quality_score), file=file_handle)
+        file_handle.flush()
+
+    if format == "flat":
+        temperature = str(round(temp_F, 2))
+        humidity = str(round(hum, 2))
+        pressure = str(round(press_A, 2))
+        pressure_sealevel = str(round(press_S, 2))
+    
+        client.publish(topic_temp, temperature)
+        client.publish(topic_hum, humidity)
+        client.publish(topic_press, pressure)
+        if options.elevation > SEALEVEL_MIN:
+            client.publish(topic_press_S, pressure_sealevel)
+        
+        if air_qality_score != 0:
+            air_qual = str(round(air_quality_score, 2))
+            client.publish(topic_aqi, air_qual)
+    else:
+        data = {}
+        data['gas'] = gas
+        data['humidity'] = hum
+        data['temperature'] = temp_F
+        data['pressure'] = press_A
+        if options.elevation:
+            data['sealevel'] = press_S
+        if air_quality_score !=0:
+            data['air_quality'] = air_quality_score
+        data['timestamp'] = curr_datetime 
+        json_data = json.dumps(data)
+        client.publish(option.topic, json.dumps(data))
+    
 def start_daemon(args):
     """function to start daemon in context, if requested
     """
@@ -75,11 +145,11 @@ def start_bme680_sensor(args):
 
     i2c_address = bme680.I2C_ADDR_PRIMARY # 0x76, alt is 0x77
 
-    toffset = 0
-    hoffset = 0
-    poffset = 0
-    elevation = SEALEVEL_MIN
-    burn_in_time = 300  # burn_in_time (in seconds) is kept track of.
+    options.toffset = 0
+    options.hoffset = 0
+    options.poffset = 0
+    options.elevation = SEALEVEL_MIN
+    options.burn_in_time = 300  # burn_in_time (in seconds) is kept track of.
 
     if args.daemon:
         file_handle = open(args.log_file, "w")
@@ -91,25 +161,25 @@ def start_bme680_sensor(args):
     mqtt_conf = configparser.ConfigParser()
     mqtt_conf.read(args.config)
 
-    topic = mqtt_conf.get(args.section, 'topic')
+    options.topic = mqtt_conf.get(args.section, 'topic')
 
     if mqtt_conf.has_option(args.section, 'address'):
         i2c_address = int(mqtt_conf.get(args.section, 'address'), 0)
 
     if mqtt_conf.has_option(args.section, 'toffset'):
-        toffset = float(mqtt_conf.get(args.section, 'toffset'))
+        options.toffset = float(mqtt_conf.get(args.section, 'toffset'))
 
     if mqtt_conf.has_option(args.section, 'hoffset'):
-        hoffset = float(mqtt_conf.get(args.section, 'hoffset'))
+        options.hoffset = float(mqtt_conf.get(args.section, 'hoffset'))
 
     if mqtt_conf.has_option(args.section, 'poffset'):
-        poffset = float(mqtt_conf.get(args.section, 'poffset'))
+        options.poffset = float(mqtt_conf.get(args.section, 'poffset'))
 
     if mqtt_conf.has_option(args.section, 'elevation'):
-        elevation = float(mqtt_conf.get(args.section, 'elevation'))
+        options.elevation = float(mqtt_conf.get(args.section, 'elevation'))
 
     if mqtt_conf.has_option(args.section, 'burnin'):
-        burn_in_time = float(mqtt_conf.get(args.section, 'burnin'))
+        options.burn_in_time = float(mqtt_conf.get(args.section, 'burnin'))
 
     if (mqtt_conf.has_option(args.section, 'username') and
             mqtt_conf.has_option(args.section, 'password')):
@@ -124,11 +194,11 @@ def start_bme680_sensor(args):
     client.connect(host, port, 60)
     client.loop_start()
 
-    topic_temp  = topic + '/' + 'bme680-temperature'
-    topic_hum   = topic + '/' + 'bme680-humidity'
-    topic_press = topic + '/' + 'bme680-pressure'
-    topic_press_S = topic + '/' + 'bme680-sealevel-pressure'
-    topic_aqi   = topic + '/' + 'bme680-air-quality'
+    topic_temp  = options.topic + '/' + 'bme680-temperature'
+    topic_hum   = options.topic + '/' + 'bme680-humidity'
+    topic_press = options.topic + '/' + 'bme680-pressure'
+    topic_press_S = options.topic + '/' + 'bme680-sealevel-pressure'
+    topic_aqi   = options.topic + '/' + 'bme680-air-quality'
     
     # Initialise the BME280
     bus = SMBus(1)
@@ -169,52 +239,58 @@ def start_bme680_sensor(args):
     if args.verbose:
         curr_datetime = datetime.datetime.now()
         str_datetime = curr_datetime.strftime("%Y-%m-%d %H:%M:%S")
-        print("{0}: collecting gas resistance burn-in data for {1:d} sec".format(str_datetime, burn_in_time) , file=file_handle) 
-    while curr_time - start_time < burn_in_time:
+        print("{0}: collecting gas resistance burn-in data for {1:d} sec".format(str_datetime, options.burn_in_time) , file=file_handle)
+        
+    while curr_time - start_time < options.burn_in_time:
         curr_time = time.time()
         if sensor.get_sensor_data() and sensor.data.heat_stable:
             gas = sensor.data.gas_resistance
             burn_in_data.append(gas)
-
-            hum = sensor.data.humidity + hoffset
-
-            temp_C = sensor.data.temperature
-            temp_F = 9.0/5.0 * temp_C + 32 + toffset
-            temp_K = temp_C + 273.15
-
-            press_A = sensor.data.pressure + poffset
-
-            # https://www.sandhurstweather.org.uk/barometric.pdf
-            if elevation > SEALEVEL_MIN:
-                # option one: Sea Level Pressure = Station Pressure / e ** -elevation / (temperature x 29.263)
-                #press_S = press_A / math.exp( - elevation / (temp_K * 29.263))
-                # option two: Sea Level Pressure = Station Pressure + (elevation/9.2)
-                press_S = press_A + (elevation/9.2)
-            else:
-                press_S = press_A
-
             my_time = int(round(curr_time))
-            if (my_time % 60 == 0): 
-                curr_datetime = datetime.datetime.now()
-                str_datetime = curr_datetime.strftime("%Y-%m-%d %H:%M:%S")
-                
-                if args.verbose:
-                    print("{0}: gas burn-in: {1:.2f} Ohms, temperature: {2:.2f} F, humidity: {3:.2f} %RH".
-                          format(str_datetime, gas, temp_F, hum), file=file_handle)
-                    file_handle.flush()
-
-                temperature = str(round(temp_F, 2))
-                humidity = str(round(hum, 2))
-                pressure = str(round(press_A, 2))
-                pressure_sealevel = str(round(press_S, 2))
-
-                client.publish(topic_temp, temperature)
-                client.publish(topic_hum, humidity)
-                client.publish(topic_press, pressure)
-                if elevation > SEALEVEL_MIN:
-                    client.publish(topic_press_S, pressure_sealevel)
-
+            if (my_time % 60 == 0):
+                publish_mqtt(sensor.data, air_quality_score=0, options, file_handle, "flat")
+ 
             time.sleep(1)
+            
+
+#             hum = sensor.data.humidity + options.hoffset
+# 
+#             temp_C = sensor.data.temperature
+#             temp_F = 9.0/5.0 * temp_C + 32 + options.toffset
+#             temp_K = temp_C + 273.15
+# 
+#             press_A = sensor.data.pressure + options.poffset
+# 
+#             # https://www.sandhurstweather.org.uk/barometric.pdf
+#             if options.elevation > SEALEVEL_MIN:
+#                 # option one: Sea Level Pressure = Station Pressure / e ** -elevation / (temperature x 29.263)
+#                 #press_S = press_A / math.exp( - elevation / (temp_K * 29.263))
+#                 # option two: Sea Level Pressure = Station Pressure + (elevation/9.2)
+#                 press_S = press_A + (elevation/9.2)
+#             else:
+#                 press_S = press_A
+# 
+#             my_time = int(round(curr_time))
+#             if (my_time % 60 == 0): 
+#                 curr_datetime = datetime.datetime.now()
+#                 str_datetime = curr_datetime.strftime("%Y-%m-%d %H:%M:%S")
+#                 
+#                 if args.verbose:
+#                     print("{0}: gas: {1:.2f} Ohms, temperature: {2:.2f} F, humidity: {3:.2f} %RH, pressure: {4:.2f} hPa, sealevel: {5:.2f} hPa, air quality: {6:.2f} %".
+#                           format(str_datetime, gas, temp_F, hum, press_A, press_S, air_quality_score), file=file_handle)
+#                     file_handle.flush()
+# 
+#                 temperature = str(round(temp_F, 2))
+#                 humidity = str(round(hum, 2))
+#                 pressure = str(round(press_A, 2))
+#                 pressure_sealevel = str(round(press_S, 2))
+# 
+#                 client.publish(topic_temp, temperature)
+#                 client.publish(topic_hum, humidity)
+#                 client.publish(topic_press, pressure)
+#                 if elevation > SEALEVEL_MIN:
+#                     client.publish(topic_press_S, pressure_sealevel)
+#            time.sleep(1)
 
     gas_baseline = sum(burn_in_data[-50:]) / 50.0
 
@@ -230,31 +306,30 @@ def start_bme680_sensor(args):
     print("{0}: burn-in complete: gas baseline: {1:.2f} Ohms, humidity baseline: {2:.2f} %RH\n".
           format(str_datetime, gas_baseline, hum_baseline), file=file_handle)
 
-
     while True:
         if sensor.get_sensor_data() and sensor.data.heat_stable:
             
-            curr_time = time.time()
-            gas = sensor.data.gas_resistance
-            gas_offset = gas_baseline - gas
-
-            hum = sensor.data.humidity + hoffset
-            hum_offset = hum - hum_baseline
-
-            temp_C = sensor.data.temperature
-            temp_F = 9.0/5.0 * temp_C + 32 + toffset
-            temp_K = temp_C + 273.15
-
-            press_A = sensor.data.pressure + poffset
-
-            # https://www.sandhurstweather.org.uk/barometric.pdf
-            if elevation > SEALEVEL_MIN:
-                # option one: Sea Level Pressure = Station Pressure / e ** -elevation / (temperature x 29.263)
-                #press_S = press_A / math.exp( - elevation / (temp_K * 29.263))
-                # option two: Sea Level Pressure = Station Pressure + (elevation/9.2)
-                press_S = press_A + (elevation/9.2)
-            else:
-                press_S = press_A
+#            curr_time = time.time()
+#             gas = sensor.data.gas_resistance
+#             gas_offset = gas_baseline - gas
+# 
+#             hum = sensor.data.humidity + options.hoffset
+#             hum_offset = hum - hum_baseline
+# 
+#             temp_C = sensor.data.temperature
+#             temp_F = 9.0/5.0 * temp_C + 32 + options.toffset
+#             temp_K = temp_C + 273.15
+# 
+#             press_A = sensor.data.pressure + options.poffset
+# 
+#             # https://www.sandhurstweather.org.uk/barometric.pdf
+#             if options.elevation > SEALEVEL_MIN:
+#                 # option one: Sea Level Pressure = Station Pressure / e ** -elevation / (temperature x 29.263)
+#                 #press_S = press_A / math.exp( - elevation / (temp_K * 29.263))
+#                 # option two: Sea Level Pressure = Station Pressure + (elevation/9.2)
+#                 press_S = press_A + (elevation/9.2)
+#             else:
+#                 press_S = press_A
 
             # Calculate hum_score as the distance from the hum_baseline.
             if hum_offset > 0:
@@ -274,33 +349,31 @@ def start_bme680_sensor(args):
             air_quality_score = hum_score + gas_score
            
             my_time = int(round(curr_time))
-
-
             if (my_time % 60 == 0): 
-
-                curr_datetime = datetime.datetime.now()
-                str_datetime = curr_datetime.strftime("%Y-%m-%d %H:%M:%S")
-                
-                if args.verbose:
-                    print("{0}: Gas: {1:.2f} Ohms, temperature: {2:.2f} F, humidity: {3:.2f} %RH, pressure: {4:.2f} hPa, sealevel: {5:.2f} hPa, air quality: {6:.2f} %".
-                          format(str_datetime, gas, temp_F, hum, press_A, press_S, air_quality_score), file=file_handle)
-                    file_handle.flush()
-
-
-                temperature = str(round(temp_F, 2))
-                humidity = str(round(hum, 2))
-                pressure = str(round(press_A, 2))
-                pressure_sealevel = str(round(press_S, 2))
-                air_qual = str(round(air_quality_score, 2))
-            
-                client.publish(topic_temp, temperature)
-                client.publish(topic_hum, humidity)
-                client.publish(topic_press, pressure)
-                
-                if elevation > SEALEVEL_MIN:
-                    client.publish(topic_press_S, pressure_sealevel)
-
-                client.publish(topic_aqi, air_qual)
+                publish_mqtt(sensor.data, air_quality_score, options, file_handle, "flat")
+#                 curr_datetime = datetime.datetime.now()
+#                 str_datetime = curr_datetime.strftime("%Y-%m-%d %H:%M:%S")
+#                 
+#                 if args.verbose:
+#                     print("{0}: Gas: {1:.2f} Ohms, temperature: {2:.2f} F, humidity: {3:.2f} %RH, pressure: {4:.2f} hPa, sealevel: {5:.2f} hPa, air quality: {6:.2f} %".
+#                           format(str_datetime, gas, temp_F, hum, press_A, press_S, air_quality_score), file=file_handle)
+#                     file_handle.flush()
+# 
+# 
+#                 temperature = str(round(temp_F, 2))
+#                 humidity = str(round(hum, 2))
+#                 pressure = str(round(press_A, 2))
+#                 pressure_sealevel = str(round(press_S, 2))
+#                 air_qual = str(round(air_quality_score, 2))
+#             
+#                 client.publish(topic_temp, temperature)
+#                 client.publish(topic_hum, humidity)
+#                 client.publish(topic_press, pressure)
+#                 
+#                 if elevation > SEALEVEL_MIN:
+#                     client.publish(topic_press_S, pressure_sealevel)
+# 
+#                 client.publish(topic_aqi, air_qual)
 
             time.sleep(1)
 
