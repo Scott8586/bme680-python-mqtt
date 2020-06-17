@@ -53,7 +53,7 @@ def on_connect(client, userdata, flags, return_code):
         print("Connected with result code: ", str(return_code))
 
 
-def publish_mqtt(sensor_data, air_quality_score=0, options, file_handle, format = "flat"):
+def publish_mqtt(sensor_data, options, file_handle, air_quality_score=0, format = "flat"):
     """Publish the sensor data to mqtt, in either flat, or JSON format
     """
     
@@ -194,11 +194,11 @@ def start_bme680_sensor(args):
     client.connect(host, port, 60)
     client.loop_start()
 
-    topic_temp  = options.topic + '/' + 'bme680-temperature'
-    topic_hum   = options.topic + '/' + 'bme680-humidity'
-    topic_press = options.topic + '/' + 'bme680-pressure'
-    topic_press_S = options.topic + '/' + 'bme680-sealevel-pressure'
-    topic_aqi   = options.topic + '/' + 'bme680-air-quality'
+#     topic_temp  = options.topic + '/' + 'bme680-temperature'
+#     topic_hum   = options.topic + '/' + 'bme680-humidity'
+#     topic_press = options.topic + '/' + 'bme680-pressure'
+#     topic_press_S = options.topic + '/' + 'bme680-sealevel-pressure'
+#     topic_aqi   = options.topic + '/' + 'bme680-air-quality'
     
     # Initialise the BME280
     bus = SMBus(1)
@@ -248,7 +248,7 @@ def start_bme680_sensor(args):
             burn_in_data.append(gas)
             my_time = int(round(curr_time))
             if (my_time % 60 == 0):
-                publish_mqtt(sensor.data, air_quality_score=0, options, file_handle, "flat")
+                publish_mqtt(sensor.data, options, file_handle)
  
             time.sleep(1)
             
@@ -350,7 +350,7 @@ def start_bme680_sensor(args):
            
             my_time = int(round(curr_time))
             if (my_time % 60 == 0): 
-                publish_mqtt(sensor.data, air_quality_score, options, file_handle, "flat")
+                publish_mqtt(sensor.data, options, file_handle, air_quality_score)
 #                 curr_datetime = datetime.datetime.now()
 #                 str_datetime = curr_datetime.strftime("%Y-%m-%d %H:%M:%S")
 #                 
