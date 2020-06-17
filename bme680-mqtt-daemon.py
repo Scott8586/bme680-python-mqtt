@@ -313,26 +313,11 @@ def start_bme680_sensor(args):
         if sensor.get_sensor_data() and sensor.data.heat_stable:
             
 #            curr_time = time.time()
-             gas = sensor.data.gas_resistance
-             gas_offset = gas_baseline - gas
+            gas = sensor.data.gas_resistance
+            gas_offset = gas_baseline - gas
 
-             hum = sensor.data.humidity + options.hoffset
-             hum_offset = hum - hum_baseline
-# 
-#             temp_C = sensor.data.temperature
-#             temp_F = 9.0/5.0 * temp_C + 32 + options.toffset
-#             temp_K = temp_C + 273.15
-# 
-#             press_A = sensor.data.pressure + options.poffset
-# 
-#             # https://www.sandhurstweather.org.uk/barometric.pdf
-#             if options.elevation > SEALEVEL_MIN:
-#                 # option one: Sea Level Pressure = Station Pressure / e ** -elevation / (temperature x 29.263)
-#                 #press_S = press_A / math.exp( - elevation / (temp_K * 29.263))
-#                 # option two: Sea Level Pressure = Station Pressure + (elevation/9.2)
-#                 press_S = press_A + (elevation/9.2)
-#             else:
-#                 press_S = press_A
+            hum = sensor.data.humidity + options.hoffset
+            hum_offset = hum - hum_baseline
 
             # Calculate hum_score as the distance from the hum_baseline.
             if hum_offset > 0:
