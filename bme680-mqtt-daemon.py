@@ -313,11 +313,11 @@ def start_bme680_sensor(args):
         if sensor.get_sensor_data() and sensor.data.heat_stable:
             
 #            curr_time = time.time()
-#             gas = sensor.data.gas_resistance
-#             gas_offset = gas_baseline - gas
-# 
-#             hum = sensor.data.humidity + options.hoffset
-#             hum_offset = hum - hum_baseline
+             gas = sensor.data.gas_resistance
+             gas_offset = gas_baseline - gas
+
+             hum = sensor.data.humidity + options.hoffset
+             hum_offset = hum - hum_baseline
 # 
 #             temp_C = sensor.data.temperature
 #             temp_F = 9.0/5.0 * temp_C + 32 + options.toffset
