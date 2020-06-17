@@ -103,7 +103,7 @@ def publish_mqtt(client, sensor_data, options, file_handle, air_quality_score=0,
         if options.elevation > SEALEVEL_MIN:
             client.publish(topic_press_S, pressure_sealevel)
         
-        if air_qality_score != 0:
+        if air_quality_score != 0:
             air_qual = str(round(air_quality_score, 2))
             client.publish(topic_aqi, air_qual)
     else:
