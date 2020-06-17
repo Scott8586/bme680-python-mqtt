@@ -212,7 +212,7 @@ def start_bme680_sensor(args):
         curr_datetime = datetime.datetime.now()
         str_datetime = curr_datetime.strftime("%Y-%m-%d %H:%M:%S")
         print("{0}: pid: {1:d} bme680 sensor started on 0x{2:x}, toffset: {3:0.1f} F, hoffset: {4:0.1f} %, poffset: {5:0.2f} hPa".
-              format(str_datetime, os.getpid(), i2c_address, toffset, hoffset, poffset), file=file_handle)
+              format(str_datetime, os.getpid(), i2c_address, options.toffset, options.hoffset, options.poffset), file=file_handle)
         file_handle.flush()
 
     # These oversampling settings can be tweaked to 
