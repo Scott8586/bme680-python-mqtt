@@ -87,7 +87,7 @@ def publish_mqtt(client, sensor_data, options, file_handle, air_quality_score=0,
     
     if args.verbose:
         str_datetime = curr_datetime.strftime("%Y-%m-%d %H:%M:%S")
-        print("{0}: gas: {1:.2f} Ohms, temperature: {2:.2f} F, humidity: {3:.2f} %RH, pressure: {4:.2f} hPa, sealevel: {5:.2f} hPa, air quality: {6:.2f} %".
+        print("{0}: gas: {1:.0f} Ohms, temperature: {2:.1f} F, humidity: {3:.1f} %RH, pressure: {4:.2f} hPa, sealevel: {5:.2f} hPa, air quality: {6:.2f} %".
             format(str_datetime, gas, temp_F, hum, press_A, press_S, air_quality_score), file=file_handle)
         file_handle.flush()
 
@@ -316,7 +316,7 @@ def start_bme680_sensor(args):
 
     curr_datetime = datetime.datetime.now()
     str_datetime = curr_datetime.strftime("%Y-%m-%d %H:%M:%S")
-    print("{0}: burn-in complete: gas baseline: {1:.2f} Ohms, humidity baseline: {2:.2f} %RH".
+    print("{0}: burn-in complete: gas baseline: {1:.0f} Ohms, humidity baseline: {2:.1f} %RH".
           format(str_datetime, gas_baseline, hum_baseline), file=file_handle)
 
     while True:
