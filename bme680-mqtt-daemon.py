@@ -118,7 +118,7 @@ def publish_mqtt(client, sensor_data, options, file_handle, air_quality_score=0)
             data['sealevel'] = press_S
         if air_quality_score !=0:
             data['air_quality'] = air_quality_score
-        data['timestamp'] = curr_datetime 
+        data['timestamp'] = curr_datetime.isoformat() 
         json_data = json.dumps(data)
         client.publish(option.topic, json.dumps(data))
     
