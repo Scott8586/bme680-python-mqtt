@@ -121,7 +121,7 @@ def publish_mqtt(client, sensor_data, options, file_handle, air_quality_score=0,
         data['burn_in'] = str(gas_baseline !=0)
         if gas_baseline != 0:
             data['gas_baseline'] = round(gas_baseline, 2) 
-        data['timestamp'] = curr_datetime.isoformat('T', 'seconds') 
+        data['timestamp'] = curr_datetime.replace(microsecond=0).isoformat()
 
         json_data = json.dumps(data)
         client.publish(options.topic, json.dumps(data))
