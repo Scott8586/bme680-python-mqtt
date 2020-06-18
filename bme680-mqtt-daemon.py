@@ -54,7 +54,7 @@ def on_connect(client, userdata, flags, return_code):
         print("Connected with result code: ", str(return_code))
 
 
-def publish_mqtt(client, sensor_data, options, file_handle, air_quality_score=0, format = "flat"):
+def publish_mqtt(client, sensor_data, options, file_handle, air_quality_score=0):
     """Publish the sensor data to mqtt, in either flat, or JSON format
     """
     
@@ -91,7 +91,7 @@ def publish_mqtt(client, sensor_data, options, file_handle, air_quality_score=0,
             format(str_datetime, gas, temp_F, hum, press_A, press_S, air_quality_score), file=file_handle)
         file_handle.flush()
 
-    if format == "flat":
+    if options.format == "flat":
         temperature = str(round(temp_F, 2))
         humidity = str(round(hum, 2))
         pressure = str(round(press_A, 2))
@@ -100,12 +100,14 @@ def publish_mqtt(client, sensor_data, options, file_handle, air_quality_score=0,
         client.publish(topic_temp, temperature)
         client.publish(topic_hum, humidity)
         client.publish(topic_press, pressure)
+        
         if options.elevation > SEALEVEL_MIN:
             client.publish(topic_press_S, pressure_sealevel)
         
         if air_quality_score != 0:
             air_qual = str(round(air_quality_score, 2))
             client.publish(topic_aqi, air_qual)
+            
     else:
         data = {}
         data['gas'] = gas
@@ -153,6 +155,7 @@ def start_bme680_sensor(args):
     options.poffset = 0
     options.elevation = SEALEVEL_MIN
     options.burn_in_time = 300  # burn_in_time (in seconds) is kept track of.
+    options.format = "flat"
 
     if args.daemon:
         file_handle = open(args.log_file, "w")
@@ -183,6 +186,9 @@ def start_bme680_sensor(args):
 
     if mqtt_conf.has_option(args.section, 'burnin'):
         options.burn_in_time = float(mqtt_conf.get(args.section, 'burnin'))
+
+    if mqtt_conf.has_option(args.section, 'format'):
+        options.format = float(mqtt_conf.get(args.section, 'format'))
 
     if (mqtt_conf.has_option(args.section, 'username') and
             mqtt_conf.has_option(args.section, 'password')):
