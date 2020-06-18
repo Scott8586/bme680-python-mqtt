@@ -120,7 +120,7 @@ def publish_mqtt(client, sensor_data, options, file_handle, air_quality_score=0)
             data['air_quality'] = air_quality_score
         data['timestamp'] = curr_datetime.isoformat() 
         json_data = json.dumps(data)
-        client.publish(option.topic, json.dumps(data))
+        client.publish(options.topic, json.dumps(data))
     
 def start_daemon(args):
     """function to start daemon in context, if requested
