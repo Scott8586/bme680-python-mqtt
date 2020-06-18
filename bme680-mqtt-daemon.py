@@ -54,7 +54,7 @@ def on_connect(client, userdata, flags, return_code):
         print("Connected with result code: ", str(return_code))
 
 
-def publish_mqtt(client, sensor_data, options, file_handle, air_quality_score=0):
+def publish_mqtt(client, sensor_data, options, file_handle, air_quality_score=0, gas_baseline=0):
     """Publish the sensor data to mqtt, in either flat, or JSON format
     """
     
@@ -92,8 +92,8 @@ def publish_mqtt(client, sensor_data, options, file_handle, air_quality_score=0)
         file_handle.flush()
 
     if options.format == "flat":
-        temperature = str(round(temp_F, 2))
-        humidity = str(round(hum, 2))
+        temperature = str(round(temp_F, 1))
+        humidity = str(round(hum, 1))
         pressure = str(round(press_A, 2))
         pressure_sealevel = str(round(press_S, 2))
     
@@ -110,15 +110,19 @@ def publish_mqtt(client, sensor_data, options, file_handle, air_quality_score=0)
             
     else:
         data = {}
-        data['gas'] = gas
-        data['humidity'] = hum
-        data['temperature'] = temp_F
-        data['pressure'] = press_A
+        data['gas'] = round(gas, 1)
+        data['humidity'] = round(hum, 1)
+        data['temperature'] = round(temp_F, 2)
+        data['pressure'] = round(press_A, 2)
         if options.elevation:
-            data['sealevel'] = press_S
+            data['sealevel'] = round(press_S, 2)
         if air_quality_score !=0:
-            data['air_quality'] = air_quality_score
-        data['timestamp'] = curr_datetime.isoformat() 
+            data['air_quality'] = round(air_quality_score, 2)
+        data['burn_in'] = str(gas_baseline !=0)
+        if gas_baseline != 0:
+            data['gas_baseline'] = round(gas_baseline, 2) 
+        data['timestamp'] = curr_datetime.isoformat('T', 'seconds') 
+
         json_data = json.dumps(data)
         client.publish(options.topic, json.dumps(data))
     
@@ -156,6 +160,7 @@ def start_bme680_sensor(args):
     options.elevation = SEALEVEL_MIN
     options.burn_in_time = 300  # burn_in_time (in seconds) is kept track of.
     options.format = "flat"
+    options.
 
     if args.daemon:
         file_handle = open(args.log_file, "w")
@@ -344,7 +349,7 @@ def start_bme680_sensor(args):
            
             my_time = int(round(curr_time))
             if (my_time % 60 == 0): 
-                publish_mqtt(client, sensor.data, options, file_handle, air_quality_score)
+                publish_mqtt(client, sensor.data, options, file_handle, air_quality_score, gas_baseline)
                 
             time.sleep(1)
 
