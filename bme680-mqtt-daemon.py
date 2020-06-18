@@ -110,7 +110,7 @@ def publish_mqtt(client, sensor_data, options, file_handle, air_quality_score=0,
             
     else:
         data = {}
-        data['gas'] = round(gas, 0)
+        data['gas'] = round(gas)
         data['humidity'] = round(hum, 1)
         data['temperature'] = round(temp_F, 1)
         data['pressure'] = round(press_A, 2)
@@ -120,7 +120,7 @@ def publish_mqtt(client, sensor_data, options, file_handle, air_quality_score=0,
             data['air_quality'] = round(air_quality_score, 2)
         data['burn_in'] = str(gas_baseline !=0)
         if gas_baseline != 0:
-            data['gas_baseline'] = round(gas_baseline, 0) 
+            data['gas_baseline'] = round(gas_baseline) 
         data['timestamp'] = curr_datetime.replace(microsecond=0).isoformat()
 
         json_data = json.dumps(data)
