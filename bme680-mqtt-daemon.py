@@ -160,8 +160,7 @@ def start_bme680_sensor(args):
     options.elevation = SEALEVEL_MIN
     options.burn_in_time = 300  # burn_in_time (in seconds) is kept track of.
     options.format = "flat"
-    options.
-
+    
     if args.daemon:
         file_handle = open(args.log_file, "w")
     else:
