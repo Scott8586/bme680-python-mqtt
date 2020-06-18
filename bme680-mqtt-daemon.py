@@ -188,7 +188,7 @@ def start_bme680_sensor(args):
         options.burn_in_time = float(mqtt_conf.get(args.section, 'burnin'))
 
     if mqtt_conf.has_option(args.section, 'format'):
-        options.format = float(mqtt_conf.get(args.section, 'format'))
+        options.format = mqtt_conf.get(args.section, 'format')
 
     if (mqtt_conf.has_option(args.section, 'username') and
             mqtt_conf.has_option(args.section, 'password')):
