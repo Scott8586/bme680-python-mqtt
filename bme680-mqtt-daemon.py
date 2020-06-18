@@ -316,7 +316,7 @@ def start_bme680_sensor(args):
 
     curr_datetime = datetime.datetime.now()
     str_datetime = curr_datetime.strftime("%Y-%m-%d %H:%M:%S")
-    print("{0}: burn-in complete: gas baseline: {1:.2f} Ohms, humidity baseline: {2:.2f} %RH\n".
+    print("{0}: burn-in complete: gas baseline: {1:.2f} Ohms, humidity baseline: {2:.2f} %RH".
           format(str_datetime, gas_baseline, hum_baseline), file=file_handle)
 
     while True:
